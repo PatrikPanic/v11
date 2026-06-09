@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 // SHARED_HANDLERS can be defined in an ATL project implementing preview, thumbnail
 // and search filter handlers and allows sharing of document code with that project.
 #ifndef SHARED_HANDLERS
@@ -25,11 +25,21 @@ BEGIN_MESSAGE_MAP(Cv11View, CView)
 	ON_COMMAND(ID_FILE_PRINT_PREVIEW, &Cv11View::OnFilePrintPreview)
 	ON_WM_CONTEXTMENU()
 	ON_WM_RBUTTONUP()
+	ON_WM_LBUTTONDOWN()
+	ON_COMMAND(ID_SHAPE, &Cv11View::OnShape)
+	ON_COMMAND(ID_COLOR, &Cv11View::OnColor)
+	ON_REGISTERED_MESSAGE(AFX_WM_ON_HIGHLIGHT_RIBBON_LIST_ITEM, &Cv11View::OnHighlightRibbonListItem)
 END_MESSAGE_MAP()
 
 // Cv11View construction/destruction
 
-Cv11View::Cv11View() {}
+Cv11View::Cv11View()
+{
+	shape = SHAPE_RECTANGLE;
+	prevShape = SHAPE_RECTANGLE;
+	color = RGB(0, 0, 0);
+	prevColor = RGB(0, 0, 0);
+}
 
 Cv11View::~Cv11View()
 {
@@ -47,6 +57,58 @@ BOOL Cv11View::PreCreateWindow(CREATESTRUCT& cs)
 
 void Cv11View::OnDraw(CDC* pDC)
 {
+	CPen pen(PS_SOLID, 1, color);
+	CPen* pOldPen = pDC->SelectObject(&pen);
+
+	switch (shape)
+	{
+	case Cv11View::SHAPE_RECTANGLE:
+		pDC->Rectangle(&rc);
+		break;
+	case Cv11View::SHAPE_ELLIPSE:
+		pDC->Ellipse(&rc);
+		break;
+	case Cv11View::SHAPE_ROUNDRECT:
+		pDC->RoundRect(&rc, CPoint(20, 20));
+		break;
+	default:
+		break;
+	}
+
+	pDC->SelectObject(pOldPen);
+}
+
+void Cv11View::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	CRectTracker rectTracker;
+	if (rectTracker.TrackRubberBand(this, point, TRUE)) {
+		rc = rectTracker.m_rect;
+		Invalidate();
+	}
+
+	CView::OnLButtonDown(nFlags, point);
+}
+
+void Cv11View::OnShape()
+{
+	CArray<CMFCRibbonBaseElement*, CMFCRibbonBaseElement*> ribbonElements;
+	((CMainFrame*)AfxGetMainWnd())->m_wndRibbonBar.GetElementsByID(ID_SHAPE, ribbonElements);
+	CMFCRibbonGallery* gallery = (CMFCRibbonGallery*)ribbonElements.GetAt(0);
+
+	shape = static_cast<ShapeType>(gallery->GetSelectedItem());
+	prevShape = shape;
+	Invalidate();
+}
+
+void Cv11View::OnColor()
+{
+	CArray<CMFCRibbonBaseElement*, CMFCRibbonBaseElement*> ribbonElements;
+	((CMainFrame*)AfxGetMainWnd())->m_wndRibbonBar.GetElementsByID(ID_COLOR, ribbonElements);
+	CMFCRibbonColorButton* colorButton = (CMFCRibbonColorButton*)ribbonElements.GetAt(0);
+
+	color = colorButton->GetColor();
+	prevColor = color;
+	Invalidate();
 }
 
 
@@ -113,3 +175,37 @@ Cv11Doc* Cv11View::GetDocument() const // non-debug version is inline
 
 // Cv11View message handlers
 
+LRESULT Cv11View::OnHighlightRibbonListItem(WPARAM wp, LPARAM lp)
+{
+	int index = static_cast<int>(wp);
+	CMFCRibbonBaseElement* pElement = reinterpret_cast<CMFCRibbonBaseElement*>(lp);
+	UINT id = pElement->GetID();
+
+	if (id == ID_COLOR)
+	{
+		if (index == -1)
+		{
+			color = prevColor;
+		}
+		else
+		{
+			CMFCRibbonColorButton* colorBtn = static_cast<CMFCRibbonColorButton*>(pElement);
+			color = colorBtn->GetHighlightedColor();
+		}
+	}
+
+	if (id == ID_SHAPE)
+	{
+		if (index == -1)
+		{
+			shape = prevShape;
+		}
+		else
+		{
+			shape = static_cast<ShapeType>(index);
+		}
+	}
+
+	Invalidate();
+	return 0;
+}
