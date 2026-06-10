@@ -15,11 +15,9 @@ public:
 	CRect rc;
 	COLORREF color;
 	COLORREF prevColor;
-	COLORREF tempColor;
 
 	ShapeType shape;
 	ShapeType prevShape;
-	ShapeType tempShape;
 
 
 	// Operations
